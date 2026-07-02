@@ -1529,6 +1529,125 @@ function visStressCurve(accent){
   s+=`<text x="40" y="278" font-family="Barlow Condensed,sans-serif" font-weight="700" font-size="11" fill="#8fa0b0" letter-spacing="2">INCREASING STIMULATION</text>`;
   return s+'</svg>';
 }
+let _scSeq=0;
+function buildStressCurveInteractive(accent){
+  const uid='sc'+(++_scSeq);
+  // Curve geometry, shared by the drawn path and the draggable marker
+  const xL=70,xR=610,yBase=380,yPeak=150,A=yBase-yPeak,cx=340,sigma=90;
+  const yAt=x=>yBase-A*Math.exp(-Math.pow(x-cx,2)/(2*sigma*sigma));
+  let d='';for(let x=xL;x<=xR;x+=4){d+=(x===xL?'M':'L')+x.toFixed(1)+' '+yAt(x).toFixed(1)+' ';}
+  const dArea=d+'L'+xR+' '+yBase+' L'+xL+' '+yBase+' Z';
+  const rustX=120,burnX=560;
+  const zones=[
+    {max:cx-1.4*sigma,name:'Rust Out',col:'#5b6b8c',msg:'Bored and under-challenged. The work is not stretching you, and a little more stimulation would lift you back towards flow.'},
+    {max:cx-0.5*sigma,name:'Warming Up',col:'#3f8fa0',msg:'Climbing out of the flat zone. Things are starting to engage you and momentum is building.'},
+    {max:cx+0.5*sigma,name:'Productive Zone',col:accent,msg:'Stretched and challenged, working in flow. This is the middle of the curve, where good work happens.'},
+    {max:cx+1.4*sigma,name:'Tipping Over',col:'#b5713a',msg:'The pressure is mounting. Still productive, but worth watching. This is where you negotiate timescales and reset.'},
+    {max:Infinity,name:'Burn Out',col:'#9a3b4a',msg:'Overwhelmed and exhausted. Too much stimulation for too long. Time to step back, offload and protect your energy.'}
+  ];
+  const zoneFor=x=>{for(const z of zones){if(x<=z.max)return z;}return zones[zones.length-1];};
+
+  const wrap=document.createElement('div');
+  wrap.className='ns-wrap';
+  const stage=document.createElement('div');
+  stage.style.cssText='background:linear-gradient(160deg,#eef4f8,#e5edf5);border-radius:16px;padding:8px';
+  stage.innerHTML=`<svg viewBox="0 0 680 460" style="display:block;width:100%;height:auto" role="img" aria-label="Interactive stress curve, from Rust Out through the Productive Zone to Burn Out. Drag the marker to explore.">
+    <defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${accent}" stop-opacity="0.22"/><stop offset="100%" stop-color="${accent}" stop-opacity="0"/></linearGradient></defs>
+    <rect class="scFade" x="285" y="150" width="110" height="230" rx="10" fill="#c9dfe2" opacity="0"/>
+    <path class="scFade scArea" d="${dArea.trim()}" fill="url(#${uid})" opacity="0"/>
+    <path class="scCurve" d="${d.trim()}" fill="none" stroke="${accent}" stroke-width="4" stroke-linecap="round"/>
+    <line class="scFade" x1="70" y1="400" x2="600" y2="400" stroke="#c2ccda" stroke-width="1.5" opacity="0"/>
+    <path class="scFade" d="M600 400 l-8 -4 v8 z" fill="#c2ccda" opacity="0"/>
+    <text class="scFade" x="70" y="424" font-family="Barlow Condensed,sans-serif" letter-spacing="2.4" fill="#7d8aa0" font-size="12" font-weight="600">INCREASING STIMULATION</text>
+    <g class="scRise" opacity="0">
+      <text x="340" y="128" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="700" letter-spacing="2" fill="#1f6d70" font-size="15">THE PRODUCTIVE ZONE</text>
+      <text x="340" y="332" text-anchor="middle" font-family="Barlow,sans-serif" fill="#3a4a63" font-size="13">Stretched, challenged,</text>
+      <text x="340" y="350" text-anchor="middle" font-family="Barlow,sans-serif" fill="#3a4a63" font-size="13">working in flow</text>
+    </g>
+    <g class="scRise" opacity="0">
+      <circle cx="${rustX}" cy="${yAt(rustX).toFixed(1)}" r="6" fill="${accent}" stroke="#fff" stroke-width="2"/>
+      <text x="118" y="300" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="700" letter-spacing="1.4" fill="#1f2b52" font-size="15">RUST OUT</text>
+      <text x="118" y="317" text-anchor="middle" font-family="Barlow,sans-serif" fill="#8fa0b0" font-size="12">Bored, under-challenged</text>
+    </g>
+    <g class="scRise" opacity="0">
+      <circle cx="${burnX}" cy="${yAt(burnX).toFixed(1)}" r="6" fill="${accent}" stroke="#fff" stroke-width="2"/>
+      <text x="562" y="300" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="700" letter-spacing="1.4" fill="#1f2b52" font-size="15">BURN OUT</text>
+      <text x="562" y="317" text-anchor="middle" font-family="Barlow,sans-serif" fill="#8fa0b0" font-size="12">Overwhelmed, exhausted</text>
+    </g>
+    <g class="scMarker" opacity="0">
+      <line class="scGuide" x1="0" y1="0" x2="0" y2="400" stroke="#4a3b78" stroke-width="1.5" stroke-dasharray="4 4" opacity="0"/>
+      <g class="scDot" style="cursor:grab">
+        <circle class="scPulse" r="14" fill="${accent}" opacity="0.22"/>
+        <circle r="11" fill="#fff" stroke="${accent}" stroke-width="3"/>
+        <circle r="4" fill="${accent}"/>
+      </g>
+    </g>
+  </svg>`;
+  wrap.appendChild(stage);
+
+  const read=document.createElement('div');
+  read.style.cssText='display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px 18px;background:#fff;border:1px solid #dbe4ef;border-radius:14px';
+  read.innerHTML=`<span class="scBadge" style="font-family:Barlow Condensed,sans-serif;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;font-size:15px;padding:6px 14px;border-radius:999px;color:#fff;white-space:nowrap;background:${accent}">Productive Zone</span><span class="scMsg" style="font-size:15px;line-height:1.45;color:#3a4a63">Stretched and challenged, working in flow. This is the middle of the curve, where good work happens.</span>`;
+  wrap.appendChild(read);
+
+  const hint=document.createElement('p');
+  hint.className='ok-puzzle-hint';
+  hint.textContent='Drag the dot along the curve, or tap anywhere on it, to see where you sit today.';
+  wrap.appendChild(hint);
+
+  const svg=stage.querySelector('svg');
+  const dot=stage.querySelector('.scDot');
+  const guide=stage.querySelector('.scGuide');
+  const pulse=stage.querySelector('.scPulse');
+  const badge=read.querySelector('.scBadge');
+  const msg=read.querySelector('.scMsg');
+  let cur=null;
+  function place(x,sound){
+    x=Math.max(xL+6,Math.min(xR-6,x));
+    const y=yAt(x);
+    dot.setAttribute('transform','translate('+x+','+y+')');
+    guide.setAttribute('x1',x);guide.setAttribute('x2',x);
+    guide.setAttribute('y1',y+12);guide.setAttribute('y2',yBase+2);
+    const z=zoneFor(x);
+    if(z!==cur){cur=z;badge.textContent=z.name;badge.style.background=z.col;msg.textContent=z.msg;if(sound){try{playTextSizeClick();}catch(e){}}}
+  }
+  function toSvgX(clientX){const pt=svg.createSVGPoint();pt.x=clientX;pt.y=0;return pt.matrixTransform(svg.getScreenCTM().inverse()).x;}
+  let dragging=false,guideTimer=null;
+  const start=e=>{dragging=true;if(pulse)pulse.style.display='none';guide.style.opacity='0.5';e.preventDefault();};
+  const move=e=>{if(!dragging)return;const cX=e.touches?e.touches[0].clientX:e.clientX;place(toSvgX(cX),true);};
+  const end=()=>{dragging=false;guide.style.opacity='0';};
+  dot.addEventListener('mousedown',start);
+  dot.addEventListener('touchstart',start,{passive:false});
+  window.addEventListener('mousemove',move);
+  window.addEventListener('touchmove',move,{passive:false});
+  window.addEventListener('mouseup',end);
+  window.addEventListener('touchend',end);
+  svg.addEventListener('click',e=>{if(e.target.closest('.scDot'))return;place(toSvgX(e.clientX),true);guide.style.opacity='0.5';clearTimeout(guideTimer);guideTimer=setTimeout(()=>{guide.style.opacity='0';},1100);});
+
+  const curve=stage.querySelector('.scCurve');
+  const fades=stage.querySelectorAll('.scFade');
+  const rises=stage.querySelectorAll('.scRise');
+  const marker=stage.querySelector('.scMarker');
+  let played=false;
+  function runIntro(){
+    if(played)return;played=true;
+    const len=curve.getTotalLength();
+    curve.style.transition='none';
+    curve.style.strokeDasharray=len;
+    curve.style.strokeDashoffset=len;
+    curve.getBoundingClientRect();
+    curve.style.transition='stroke-dashoffset 1.6s ease';
+    curve.style.strokeDashoffset='0';
+    fades.forEach((el,i)=>{el.style.transition='opacity .7s ease';setTimeout(()=>{el.style.opacity='1';},300+i*120);});
+    rises.forEach((el,i)=>{el.style.transition='opacity .6s ease, transform .6s ease';el.style.transform='translateY(10px)';setTimeout(()=>{el.style.opacity='1';el.style.transform='translateY(0)';},1300+i*200);});
+    setTimeout(()=>{marker.style.transition='opacity .6s ease';marker.style.opacity='1';cur=null;place(cx,false);},2000);
+  }
+  if('IntersectionObserver' in window){
+    const obs=new IntersectionObserver(es=>{es.forEach(en=>{if(en.isIntersecting){runIntro();obs.unobserve(stage);}});},{threshold:0.25});
+    obs.observe(stage);
+  } else { runIntro(); }
+  return wrap;
+}
 function visLearningCycle(accent){
   const nodes=[
     ['QUESTION',280,38,'Why is this not working?'],
@@ -1968,7 +2087,7 @@ const DETAILS = {
     desc:'Being in control of your workload profile by recognising and managing known behavioural traits which can trip you up; you manage stress well and are acutely aware of your own Achilles Heel.',
     modelTitle:'The Stress Curve: Rust Out to Burn Out',
     modelDesc:'Controls Own Workload is a much wider view than time management. It means taking responsibility for managing yourself and negotiating timescales, and being honest about the kind of person you are. Stress is both a good thing and a bad thing: too little and we Rust Out, bored and under-challenged; too much and we Burn Out. In the middle sits the productive zone, where you feel stretched and challenged and work in flow. The Pioneer learns to spot which side of the curve they are on, and what brings them back to the middle.',
-    visual:visStressCurve,
+    visual:null, customVisual:'stresscurve',
     bullets:[
       'Controlling your workload is wider than time management. It is how you manage yourself, your stress and your priorities together.',
       'Know your Achilles Heel. The thing that trips you up is usually the same thing every time, and naming it is the first step to managing it.',
@@ -2174,6 +2293,9 @@ function buildDetailPage(seg){
   }
   if(det.customVisual==='motivation'){
     model.appendChild(buildMotivationInteractive(accent));
+  }
+  if(det.customVisual==='stresscurve'){
+    model.appendChild(buildStressCurveInteractive(accent));
   }
   main.appendChild(model);
   if(det.principles){
